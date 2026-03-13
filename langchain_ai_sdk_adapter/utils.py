@@ -7,6 +7,7 @@ Contains all the message conversion helpers and stream chunk processors.
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 from langchain_core.messages import (
@@ -754,7 +755,7 @@ def process_langgraph_event(
         # HITL interrupts
         if isinstance(data, dict):
             interrupt = data.get("__interrupt__")
-            if isinstance(interrupt, list):
+            if isinstance(interrupt, (list, tuple)):
                 for item in interrupt:
                     # LangGraph Python uses Interrupt objects with .value attribute,
                     # not plain dicts
@@ -766,14 +767,14 @@ def process_langgraph_event(
                         continue
                     action_requests = iv.get(
                         "actionRequests") or iv.get("action_requests")
-                    if not isinstance(action_requests, list):
+                    if not isinstance(action_requests, (list, tuple)):
                         continue
                     for ar in action_requests:
                         tool_name = ar.get("name", "")
                         tool_input = ar.get("args") or ar.get("arguments")
                         key = f"{tool_name}:{json.dumps(tool_input, separators=(',', ':'))}" if tool_input else ""
                         tc_id = state.emitted_tool_calls_by_key.get(
-                            key) or ar.get("id") or f"hitl-{tool_name}"
+                            key) or ar.get("id") or f"hitl-{tool_name}-{int(time.time() * 1000)}"
                         if tc_id not in state.emitted_tool_calls:
                             state.emitted_tool_calls.add(tc_id)
                             if key:
