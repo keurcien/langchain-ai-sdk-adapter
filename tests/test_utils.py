@@ -380,8 +380,26 @@ class TestExtractReasoning:
         chunk.contentBlocks = [{"type": "thinking", "thinking": "First, I need to analyze..."}]
         assert extract_reasoning_from_content_blocks(chunk) == "First, I need to analyze..."
 
+    def test_thinking_block_in_content(self):
+        """Anthropic/Gemini put thinking blocks in the content field."""
+        chunk = AIMessageChunk(
+            id="1",
+            content=[
+                {"type": "thinking", "thinking": "Let me reason..."},
+                {"type": "text", "text": "The answer is 42"},
+            ],
+        )
+        assert extract_reasoning_from_content_blocks(chunk) == "Let me reason..."
+
     def test_no_reasoning(self):
         chunk = AIMessageChunk(id="1", content="Hello")
+        assert extract_reasoning_from_content_blocks(chunk) is None
+
+    def test_no_reasoning_text_only_list(self):
+        chunk = AIMessageChunk(
+            id="1",
+            content=[{"type": "text", "text": "Hello"}],
+        )
         assert extract_reasoning_from_content_blocks(chunk) is None
 
     def test_dict_with_content_blocks(self):

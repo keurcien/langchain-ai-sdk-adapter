@@ -55,7 +55,8 @@ def convert_tool_result_part(block: dict[str, Any]) -> ToolMessage:
     elif otype in ("json", "error-json"):
         content = json.dumps(output.get("value", ""), separators=(",", ":"))
     elif otype == "content":
-        content = "".join(b.get("text", "") for b in output.get("value", []) if b.get("type") == "text")
+        content = "".join(b.get("text", "") for b in output.get(
+            "value", []) if b.get("type") == "text")
     else:
         content = ""
     return ToolMessage(tool_call_id=block.get("toolCallId", ""), content=content)
@@ -101,12 +102,15 @@ def convert_user_content(content: Any) -> HumanMessage:
             image = part.get("image", "")
             if isinstance(image, str):
                 if image.startswith(("http://", "https://", "data:")):
-                    blocks.append({"type": "image_url", "image_url": {"url": image}})
+                    blocks.append(
+                        {"type": "image_url", "image_url": {"url": image}})
                 else:
                     mt = part.get("mediaType", "image/png")
-                    blocks.append({"type": "image_url", "image_url": {"url": f"data:{mt};base64,{image}"}})
+                    blocks.append({"type": "image_url", "image_url": {
+                                  "url": f"data:{mt};base64,{image}"}})
             else:
-                blocks.append({"type": "image_url", "image_url": {"url": str(image)}})
+                blocks.append(
+                    {"type": "image_url", "image_url": {"url": str(image)}})
         elif ptype == "file":
             data = part.get("data", "")
             media_type = part.get("mediaType", "")
@@ -114,30 +118,39 @@ def convert_user_content(content: Any) -> HumanMessage:
             if is_image:
                 if isinstance(data, str):
                     if data.startswith(("http://", "https://", "data:")):
-                        blocks.append({"type": "image_url", "image_url": {"url": data}})
+                        blocks.append(
+                            {"type": "image_url", "image_url": {"url": data}})
                     else:
-                        blocks.append({"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{data}"}})
+                        blocks.append({"type": "image_url", "image_url": {
+                                      "url": f"data:{media_type};base64,{data}"}})
                 else:
-                    blocks.append({"type": "image_url", "image_url": {"url": str(data)}})
+                    blocks.append(
+                        {"type": "image_url", "image_url": {"url": str(data)}})
             else:
-                filename = part.get("filename") or _get_default_filename(media_type)
+                filename = part.get(
+                    "filename") or _get_default_filename(media_type)
                 if isinstance(data, str):
                     if data.startswith(("http://", "https://")):
-                        blocks.append({"type": "file", "url": data, "mimeType": media_type, "filename": filename})
+                        blocks.append(
+                            {"type": "file", "url": data, "mimeType": media_type, "filename": filename})
                     elif data.startswith("data:"):
                         import re
 
                         m = re.match(r"^data:([^;]+);base64,(.+)$", data)
                         if m:
                             blocks.append(
-                                {"type": "file", "data": m.group(2), "mimeType": m.group(1), "filename": filename}
+                                {"type": "file", "data": m.group(
+                                    2), "mimeType": m.group(1), "filename": filename}
                             )
                         else:
-                            blocks.append({"type": "file", "url": data, "mimeType": media_type, "filename": filename})
+                            blocks.append(
+                                {"type": "file", "url": data, "mimeType": media_type, "filename": filename})
                     else:
-                        blocks.append({"type": "file", "data": data, "mimeType": media_type, "filename": filename})
+                        blocks.append(
+                            {"type": "file", "data": data, "mimeType": media_type, "filename": filename})
                 else:
-                    blocks.append({"type": "file", "data": str(data), "mimeType": media_type, "filename": filename})
+                    blocks.append({"type": "file", "data": str(
+                        data), "mimeType": media_type, "filename": filename})
 
     if blocks and all(b["type"] == "text" for b in blocks):
         return HumanMessage(content="".join(b["text"] for b in blocks))
@@ -253,11 +266,18 @@ def _is_gpt5_reasoning_output(obj: Any) -> bool:
 
 
 def _get_content_blocks(msg: Any) -> list[dict[str, Any]] | None:
-    """Get contentBlocks from a message (class or dict)."""
+    """Get content blocks from a message (class or dict)."""
+    # TODO: contentBlocks doesn't exist in Python langchain — remove once confirmed unused
     if hasattr(msg, "contentBlocks"):
         return msg.contentBlocks
     ds = _data_source(msg)
-    return ds.get("contentBlocks")
+    if ds.get("contentBlocks") is not None:
+        return ds["contentBlocks"]
+    content = getattr(msg, "content", None) if not isinstance(
+        msg, dict) else ds.get("content")
+    if isinstance(content, list):
+        return content
+    return None
 
 
 def _get_additional_kwargs(msg: Any) -> dict[str, Any]:
@@ -386,11 +406,13 @@ def process_model_chunk(
         if img.get("result") and img["id"] not in state["emitted_images"]:
             state["emitted_images"].add(img["id"])
             mt = f"image/{img.get('output_format', 'png')}"
-            emit.append({"type": "file", "mediaType": mt, "url": f"data:{mt};base64,{img['result']}"})
+            emit.append({"type": "file", "mediaType": mt,
+                        "url": f"data:{mt};base64,{img['result']}"})
             state["started"] = True
 
     # Reasoning
-    reasoning = extract_reasoning_from_content_blocks(chunk) or extract_reasoning_from_values_message(chunk)
+    reasoning = extract_reasoning_from_content_blocks(
+        chunk) or extract_reasoning_from_values_message(chunk)
     if reasoning:
         if not state.get("reasoning_started"):
             state["reasoning_message_id"] = state["message_id"]
@@ -406,11 +428,13 @@ def process_model_chunk(
         )
 
     # Text content
-    content = getattr(chunk, "content", None) if not isinstance(chunk, dict) else chunk.get("content")
+    content = getattr(chunk, "content", None) if not isinstance(
+        chunk, dict) else chunk.get("content")
     if isinstance(content, str):
         text = content
     elif isinstance(content, list):
-        text = "".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+        text = "".join(b.get("text", "") for b in content if isinstance(
+            b, dict) and b.get("type") == "text")
     else:
         text = ""
 
@@ -469,7 +493,8 @@ def process_langgraph_event(
         return
 
     if etype == "messages":
-        raw_msg, metadata = data if isinstance(data, (list, tuple)) and len(data) >= 2 else (data, {})
+        raw_msg, metadata = data if isinstance(
+            data, (list, tuple)) and len(data) >= 2 else (data, {})
         if isinstance(data, (list, tuple)) and len(data) >= 1:
             raw_msg = data[0]
             metadata = data[1] if len(data) >= 2 else {}
@@ -482,7 +507,8 @@ def process_langgraph_event(
             return
 
         # Step tracking
-        lg_step = metadata.get("langgraph_step") if isinstance(metadata, dict) else None
+        lg_step = metadata.get("langgraph_step") if isinstance(
+            metadata, dict) else None
         if isinstance(lg_step, (int, float)):
             lg_step = int(lg_step)
             if lg_step != state.current_step:
@@ -509,11 +535,13 @@ def process_langgraph_event(
                 if img.get("result") and img["id"] not in state.emitted_images:
                     state.emitted_images.add(img["id"])
                     mt = f"image/{img.get('output_format', 'png')}"
-                    emit.append({"type": "file", "mediaType": mt, "url": f"data:{mt};base64,{img['result']}"})
+                    emit.append({"type": "file", "mediaType": mt,
+                                "url": f"data:{mt};base64,{img['result']}"})
 
             # Tool call chunks
             tc_chunks = ds.get("tool_call_chunks") or (
-                getattr(msg, "tool_call_chunks", None) if not isinstance(msg, dict) else None
+                getattr(msg, "tool_call_chunks", None) if not isinstance(
+                    msg, dict) else None
             )
             if tc_chunks:
                 for tc in tc_chunks:
@@ -547,7 +575,8 @@ def process_langgraph_event(
                         or "unknown"
                     )
 
-                    seen_tool = state.message_seen.get(msg_id, {}).get("tool", {})
+                    seen_tool = state.message_seen.get(
+                        msg_id, {}).get("tool", {})
                     if not seen_tool.get(tool_call_id):
                         emit.append(
                             {
@@ -557,7 +586,8 @@ def process_langgraph_event(
                                 "dynamic": True,
                             }
                         )
-                        state.message_seen.setdefault(msg_id, {}).setdefault("tool", {})[tool_call_id] = True
+                        state.message_seen.setdefault(msg_id, {}).setdefault("tool", {})[
+                            tool_call_id] = True
                         state.emitted_tool_calls.add(tool_call_id)
 
                     if tc.get("args"):
@@ -579,11 +609,14 @@ def process_langgraph_event(
 
             reasoning = extract_reasoning_from_content_blocks(msg)
             if reasoning:
-                reasoning_id = state.message_reasoning_ids.get(msg_id) or chunk_reasoning_id or msg_id
+                reasoning_id = state.message_reasoning_ids.get(
+                    msg_id) or chunk_reasoning_id or msg_id
                 if not state.message_seen.get(msg_id, {}).get("reasoning"):
                     emit.append({"type": "reasoning-start", "id": msg_id})
-                    state.message_seen.setdefault(msg_id, {})["reasoning"] = True
-                emit.append({"type": "reasoning-delta", "delta": reasoning, "id": msg_id})
+                    state.message_seen.setdefault(
+                        msg_id, {})["reasoning"] = True
+                emit.append({"type": "reasoning-delta",
+                            "delta": reasoning, "id": msg_id})
                 state.emitted_reasoning_ids.add(reasoning_id)
 
             # Text
@@ -592,7 +625,8 @@ def process_langgraph_event(
                 if not state.message_seen.get(msg_id, {}).get("text"):
                     emit.append({"type": "text-start", "id": msg_id})
                     state.message_seen.setdefault(msg_id, {})["text"] = True
-                emit.append({"type": "text-delta", "delta": text, "id": msg_id})
+                emit.append(
+                    {"type": "text-delta", "delta": text, "id": msg_id})
 
         elif is_tool_message_type(msg):
             ds = _data_source(msg)
@@ -704,12 +738,16 @@ def process_langgraph_event(
                     rid = extract_reasoning_id(m)
                     was_streamed = mid2 in state.message_seen  # already cleaned, so check emitted
                     has_tc = bool(tool_calls)
-                    should_emit = rid and rid not in state.emitted_reasoning_ids and (was_streamed or not has_tc)
+                    should_emit = rid and rid not in state.emitted_reasoning_ids and (
+                        was_streamed or not has_tc)
                     if should_emit:
-                        reasoning_text = extract_reasoning_from_values_message(m)
+                        reasoning_text = extract_reasoning_from_values_message(
+                            m)
                         if reasoning_text:
-                            emit.append({"type": "reasoning-start", "id": mid2})
-                            emit.append({"type": "reasoning-delta", "delta": reasoning_text, "id": mid2})
+                            emit.append(
+                                {"type": "reasoning-start", "id": mid2})
+                            emit.append({"type": "reasoning-delta",
+                                        "delta": reasoning_text, "id": mid2})
                             emit.append({"type": "reasoning-end", "id": mid2})
                             state.emitted_reasoning_ids.add(rid)
 
@@ -721,14 +759,16 @@ def process_langgraph_event(
                     iv = item.get("value") if isinstance(item, dict) else None
                     if not isinstance(iv, dict):
                         continue
-                    action_requests = iv.get("actionRequests") or iv.get("action_requests")
+                    action_requests = iv.get(
+                        "actionRequests") or iv.get("action_requests")
                     if not isinstance(action_requests, list):
                         continue
                     for ar in action_requests:
                         tool_name = ar.get("name", "")
                         tool_input = ar.get("args") or ar.get("arguments")
                         key = f"{tool_name}:{json.dumps(tool_input, separators=(',', ':'))}" if tool_input else ""
-                        tc_id = state.emitted_tool_calls_by_key.get(key) or ar.get("id") or f"hitl-{tool_name}"
+                        tc_id = state.emitted_tool_calls_by_key.get(
+                            key) or ar.get("id") or f"hitl-{tool_name}"
                         if tc_id not in state.emitted_tool_calls:
                             state.emitted_tool_calls.add(tc_id)
                             if key:
@@ -799,7 +839,8 @@ def _extract_tool_calls_from_msg(msg: Any) -> list[dict[str, Any]]:
         for i, tc in enumerate(ak["tool_calls"]):
             fn = tc.get("function", {})
             try:
-                args = json.loads(fn.get("arguments", "{}")) if fn.get("arguments") else {}
+                args = json.loads(fn.get("arguments", "{}")
+                                  ) if fn.get("arguments") else {}
             except (json.JSONDecodeError, TypeError):
                 args = {}
             result.append(
