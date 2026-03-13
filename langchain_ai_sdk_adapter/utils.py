@@ -756,7 +756,12 @@ def process_langgraph_event(
             interrupt = data.get("__interrupt__")
             if isinstance(interrupt, list):
                 for item in interrupt:
-                    iv = item.get("value") if isinstance(item, dict) else None
+                    # LangGraph Python uses Interrupt objects with .value attribute,
+                    # not plain dicts
+                    if isinstance(item, dict):
+                        iv = item.get("value")
+                    else:
+                        iv = getattr(item, "value", None)
                     if not isinstance(iv, dict):
                         continue
                     action_requests = iv.get(
