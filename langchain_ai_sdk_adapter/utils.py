@@ -231,10 +231,32 @@ def _data_source(msg: Any) -> dict[str, Any]:
         "tool_call_id",
         "status",
         "response_metadata",
+        "artifact",
     ):
         if hasattr(msg, attr):
             result[attr] = getattr(msg, attr)
     return result
+
+
+def _extract_structured_content(msg_or_output: Any) -> dict | None:
+    """Extract structuredContent from a ToolMessage artifact, if present.
+
+    MCP servers return structuredContent alongside tool results. The
+    ``langchain-mcp-adapters`` library wraps this in the ToolMessage
+    artifact as ``{"structured_content": {...}}``.
+
+    Returns the structured_content dict, or None if not present.
+    """
+    artifact = (
+        getattr(msg_or_output, "artifact", None)
+        if not isinstance(msg_or_output, dict)
+        else msg_or_output.get("artifact")
+    )
+    if isinstance(artifact, dict):
+        sc = artifact.get("structured_content")
+        if isinstance(sc, dict):
+            return sc
+    return None
 
 
 def get_message_text(msg: Any) -> str:
@@ -647,11 +669,15 @@ def process_langgraph_event(
                         }
                     )
                 else:
+                    output = ds.get("content")
+                    sc = _extract_structured_content(msg)
+                    if sc is not None:
+                        output = {"_text": output, "structuredContent": sc}
                     emit.append(
                         {
                             "type": "tool-output-available",
                             "toolCallId": tool_call_id,
-                            "output": ds.get("content"),
+                            "output": output,
                         }
                     )
         return
