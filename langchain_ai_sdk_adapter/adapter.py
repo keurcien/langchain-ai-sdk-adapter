@@ -16,6 +16,7 @@ from langchain_core.messages import BaseMessage, SystemMessage
 from ._types import LangGraphEventState
 from .callbacks import StreamCallbacks
 from .utils import (
+    _extract_structured_content,
     convert_assistant_content,
     convert_tool_result_part,
     convert_user_content,
@@ -262,8 +263,14 @@ def _process_stream_events_event(
 
     elif ev == "on_tool_end":
         rid = run_id or (data.get("run_id") if isinstance(data, dict) else None)
-        output = data.get("output") if isinstance(data, dict) else None
+        raw_output = data.get("output") if isinstance(data, dict) else None
         if rid:
+            output = raw_output.content if hasattr(raw_output, "content") else raw_output
+
+            sc = _extract_structured_content(raw_output)
+            if sc is not None:
+                output = {"_text": output, "structuredContent": sc}
+
             emit.append(
                 {
                     "type": "tool-output-available",

@@ -1242,3 +1242,130 @@ class TestToBaseMessages:
             {"type": "text", "text": "What is this?"},
             {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc123"}},
         ]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# structuredContent support
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestStructuredContent:
+    @pytest.mark.asyncio
+    async def test_tool_message_with_structured_content(self):
+        """ToolMessage with artifact.structured_content wraps output."""
+        tool_msg = ToolMessage(
+            tool_call_id="call-1",
+            content="Here are 3 animals.",
+            artifact={"structured_content": {"animals": [{"id": 1, "name": "Lion"}]}},
+            id="msg-1",
+        )
+        result = await _to_list(
+            to_ui_message_stream(
+                _async_iter(
+                    ["messages", [tool_msg, {}]],
+                    ["values", {}],
+                )
+            )
+        )
+        assert {
+            "type": "tool-output-available",
+            "toolCallId": "call-1",
+            "output": {
+                "_text": "Here are 3 animals.",
+                "structuredContent": {"animals": [{"id": 1, "name": "Lion"}]},
+            },
+        } in result
+
+    @pytest.mark.asyncio
+    async def test_tool_message_without_artifact_unchanged(self):
+        """ToolMessage without artifact emits plain output as before."""
+        tool_msg = ToolMessage(tool_call_id="call-1", content="Sunny, 72°F", id="msg-1")
+        result = await _to_list(
+            to_ui_message_stream(
+                _async_iter(
+                    ["messages", [tool_msg, {}]],
+                    ["values", {}],
+                )
+            )
+        )
+        assert {"type": "tool-output-available", "toolCallId": "call-1", "output": "Sunny, 72°F"} in result
+
+    @pytest.mark.asyncio
+    async def test_tool_message_with_unrelated_artifact(self):
+        """ToolMessage with artifact that has no structured_content is unchanged."""
+        tool_msg = ToolMessage(
+            tool_call_id="call-1",
+            content="Done.",
+            artifact={"some_other_key": "value"},
+            id="msg-1",
+        )
+        result = await _to_list(
+            to_ui_message_stream(
+                _async_iter(
+                    ["messages", [tool_msg, {}]],
+                    ["values", {}],
+                )
+            )
+        )
+        assert {"type": "tool-output-available", "toolCallId": "call-1", "output": "Done."} in result
+
+    @pytest.mark.asyncio
+    async def test_stream_events_tool_end_with_structured_content(self):
+        """streamEvents on_tool_end with ToolMessage artifact wraps output."""
+        tool_output = ToolMessage(
+            tool_call_id="tool-call-456",
+            content="3 results found.",
+            artifact={"structured_content": {"results": [1, 2, 3]}},
+            id="tool-msg-1",
+        )
+        result = await _to_list(
+            to_ui_message_stream(
+                _async_iter(
+                    {
+                        "event": "on_tool_start",
+                        "run_id": "tool-call-456",
+                        "data": {"name": "search"},
+                        "name": "search",
+                    },
+                    {
+                        "event": "on_tool_end",
+                        "run_id": "tool-call-456",
+                        "data": {"output": tool_output},
+                    },
+                )
+            )
+        )
+        assert {
+            "type": "tool-output-available",
+            "toolCallId": "tool-call-456",
+            "output": {
+                "_text": "3 results found.",
+                "structuredContent": {"results": [1, 2, 3]},
+            },
+        } in result
+
+    @pytest.mark.asyncio
+    async def test_stream_events_tool_end_plain_string_unchanged(self):
+        """streamEvents on_tool_end with plain string output remains unchanged."""
+        result = await _to_list(
+            to_ui_message_stream(
+                _async_iter(
+                    {
+                        "event": "on_tool_start",
+                        "run_id": "tool-call-789",
+                        "data": {"name": "get_weather"},
+                        "name": "get_weather",
+                    },
+                    {
+                        "event": "on_tool_end",
+                        "run_id": "tool-call-789",
+                        "data": {"output": "Sunny, 72°F"},
+                    },
+                )
+            )
+        )
+        assert {
+            "type": "tool-output-available",
+            "toolCallId": "tool-call-789",
+            "output": "Sunny, 72°F",
+        } in result

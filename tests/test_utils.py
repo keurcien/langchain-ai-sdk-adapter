@@ -12,6 +12,7 @@ from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, Too
 
 from langchain_ai_sdk_adapter._types import LangGraphEventState
 from langchain_ai_sdk_adapter.utils import (
+    _extract_structured_content,
     convert_assistant_content,
     convert_tool_result_part,
     convert_user_content,
@@ -524,3 +525,41 @@ class TestProcessLangGraphEvent:
         msg = AIMessage(content="No ID")
         process_langgraph_event(["messages", [msg, {}]], state, emit)
         assert emit == []
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# _extract_structured_content
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestExtractStructuredContent:
+    def test_from_tool_message_with_artifact(self):
+        msg = ToolMessage(
+            tool_call_id="c1",
+            content="ok",
+            artifact={"structured_content": {"data": [1, 2]}},
+        )
+        assert _extract_structured_content(msg) == {"data": [1, 2]}
+
+    def test_from_tool_message_without_artifact(self):
+        msg = ToolMessage(tool_call_id="c1", content="ok")
+        assert _extract_structured_content(msg) is None
+
+    def test_from_tool_message_artifact_no_sc(self):
+        msg = ToolMessage(tool_call_id="c1", content="ok", artifact={"other": 1})
+        assert _extract_structured_content(msg) is None
+
+    def test_from_dict_with_artifact(self):
+        d = {"artifact": {"structured_content": {"items": []}}}
+        assert _extract_structured_content(d) == {"items": []}
+
+    def test_from_none(self):
+        assert _extract_structured_content(None) is None
+
+    def test_non_dict_structured_content_ignored(self):
+        msg = ToolMessage(
+            tool_call_id="c1",
+            content="ok",
+            artifact={"structured_content": "not a dict"},
+        )
+        assert _extract_structured_content(msg) is None
