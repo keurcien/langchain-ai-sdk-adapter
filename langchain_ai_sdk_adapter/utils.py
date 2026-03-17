@@ -797,8 +797,9 @@ def process_langgraph_event(
                         continue
                     for ar in action_requests:
                         tool_name = ar.get("name", "")
-                        tool_input = ar.get("args") or ar.get("arguments")
-                        key = f"{tool_name}:{json.dumps(tool_input, separators=(',', ':'))}" if tool_input else ""
+                        tool_input = ar.get("args") if ar.get(
+                            "args") is not None else ar.get("arguments")
+                        key = f"{tool_name}:{json.dumps(tool_input, separators=(',', ':'))}" if tool_input is not None else ""
                         tc_id = state.emitted_tool_calls_by_key.get(
                             key) or ar.get("id") or f"hitl-{tool_name}-{int(time.time() * 1000)}"
                         if tc_id not in state.emitted_tool_calls:
