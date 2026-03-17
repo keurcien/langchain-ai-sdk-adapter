@@ -33,7 +33,7 @@ from .utils import (
 
 # Note: The JS version calls the ``ai`` package's ``convertToModelMessages``
 # to turn UIMessage[] → ModelMessage[].  In Python we don't have that package,
-# so ``to_base_messages`` is a thin pass-through to ``convert_model_messages``
+# so ``to_lc_messages`` is a thin pass-through to ``convert_model_messages``
 # when the caller already has the model-message format.  In practice, a
 # FastAPI endpoint should call ``convert_model_messages`` directly on the
 # parsed JSON.
@@ -63,7 +63,7 @@ def convert_model_messages(model_messages: list[dict[str, Any]]) -> list[BaseMes
     return result
 
 
-async def to_base_messages(ui_messages: list[dict[str, Any]]) -> list[BaseMessage]:
+async def to_lc_messages(ui_messages: list[dict[str, Any]]) -> list[BaseMessage]:
     """Convert AI SDK ``UIMessage`` dicts into LangChain messages.
 
     The JS version calls ``convertToModelMessages`` from the ``ai`` package

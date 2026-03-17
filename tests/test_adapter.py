@@ -21,7 +21,7 @@ from langchain_core.messages import (
 
 from langchain_ai_sdk_adapter.adapter import (
     convert_model_messages,
-    to_base_messages,
+    to_lc_messages,
     to_ui_message_stream,
 )
 from langchain_ai_sdk_adapter.callbacks import StreamCallbacks
@@ -1203,7 +1203,7 @@ class TestConvertModelMessages:
 class TestToBaseMessages:
     @pytest.mark.asyncio
     async def test_basic(self):
-        result = await to_base_messages(
+        result = await to_lc_messages(
             [
                 {"id": "1", "role": "user", "parts": [{"type": "text", "text": "Hello!"}]},
                 {"id": "2", "role": "assistant", "parts": [{"type": "text", "text": "Hi!"}]},
@@ -1215,7 +1215,7 @@ class TestToBaseMessages:
 
     @pytest.mark.asyncio
     async def test_system(self):
-        result = await to_base_messages(
+        result = await to_lc_messages(
             [
                 {"id": "1", "role": "system", "parts": [{"type": "text", "text": "Be helpful."}]},
             ]
@@ -1225,7 +1225,7 @@ class TestToBaseMessages:
 
     @pytest.mark.asyncio
     async def test_user_with_image_file(self):
-        result = await to_base_messages(
+        result = await to_lc_messages(
             [
                 {
                     "id": "1",
