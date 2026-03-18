@@ -23,7 +23,6 @@ from langchain_ai_sdk_adapter.utils import (
     is_plain_message_object,
     is_tool_message_type,
     is_tool_result_part,
-    parse_langgraph_event,
     process_langgraph_event,
     process_model_chunk,
 )
@@ -351,19 +350,6 @@ class TestMessageHelpers:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# parseLangGraphEvent
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-class TestParseLangGraphEvent:
-    def test_two_element(self):
-        assert parse_langgraph_event(["values", {"data": 1}]) == ("values", {"data": 1})
-
-    def test_three_element(self):
-        assert parse_langgraph_event(["ns", "custom", {"data": 1}]) == ("custom", {"data": 1})
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 # extractReasoningFromContentBlocks
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -474,7 +460,7 @@ class TestProcessLangGraphEvent:
     def test_custom_event(self):
         state = LangGraphEventState()
         emit: list[dict[str, Any]] = []
-        process_langgraph_event(["custom", {"custom": "data"}], state, emit)
+        process_langgraph_event("custom", {"custom": "data"}, state, emit)
         assert emit == [
             {
                 "type": "data-custom",
@@ -488,7 +474,7 @@ class TestProcessLangGraphEvent:
         state = LangGraphEventState()
         emit: list[dict[str, Any]] = []
         chunk = AIMessageChunk(content="Hello", id="msg-1")
-        process_langgraph_event(["messages", [chunk, {}]], state, emit)
+        process_langgraph_event("messages", (chunk, {}), state, emit)
         assert {"type": "text-start", "id": "msg-1"} in emit
         assert {"type": "text-delta", "delta": "Hello", "id": "msg-1"} in emit
 
@@ -496,7 +482,7 @@ class TestProcessLangGraphEvent:
         state = LangGraphEventState()
         emit: list[dict[str, Any]] = []
         tool_msg = ToolMessage(tool_call_id="call-1", content="Sunny", id="msg-1")
-        process_langgraph_event(["messages", [tool_msg, {}]], state, emit)
+        process_langgraph_event("messages", (tool_msg, {}), state, emit)
         assert emit == [{"type": "tool-output-available", "toolCallId": "call-1", "output": "Sunny"}]
 
     def test_values_event_finalizes(self):
@@ -504,10 +490,10 @@ class TestProcessLangGraphEvent:
         emit: list[dict[str, Any]] = []
 
         chunk = AIMessageChunk(content="Hello", id="msg-1")
-        process_langgraph_event(["messages", [chunk, {}]], state, emit)
+        process_langgraph_event("messages", (chunk, {}), state, emit)
         emit.clear()
 
-        process_langgraph_event(["values", {}], state, emit)
+        process_langgraph_event("values", {}, state, emit)
         assert {"type": "text-end", "id": "msg-1"} in emit
 
     def test_step_tracking(self):
@@ -515,7 +501,7 @@ class TestProcessLangGraphEvent:
         emit: list[dict[str, Any]] = []
 
         chunk = AIMessageChunk(content="Hello", id="msg-1")
-        process_langgraph_event(["messages", [chunk, {"langgraph_step": 0}]], state, emit)
+        process_langgraph_event("messages", (chunk, {"langgraph_step": 0}), state, emit)
         assert {"type": "start-step"} in emit
         assert state.current_step == 0
 
@@ -523,8 +509,21 @@ class TestProcessLangGraphEvent:
         state = LangGraphEventState()
         emit: list[dict[str, Any]] = []
         msg = AIMessage(content="No ID")
-        process_langgraph_event(["messages", [msg, {}]], state, emit)
+        process_langgraph_event("messages", (msg, {}), state, emit)
         assert emit == []
+
+    def test_v2_native_interrupts(self):
+        class FakeInterrupt:
+            def __init__(self, value):
+                self.value = value
+
+        state = LangGraphEventState()
+        emit: list[dict[str, Any]] = []
+        interrupts = (FakeInterrupt(value={"action_requests": [{"name": "tool_x", "args": {"a": 1}, "id": "call-x1"}]}),)
+        process_langgraph_event("values", {"messages": []}, state, emit, interrupts=interrupts)
+        approvals = [e for e in emit if e.get("type") == "tool-approval-request"]
+        assert len(approvals) == 1
+        assert approvals[0]["toolCallId"] == "call-x1"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

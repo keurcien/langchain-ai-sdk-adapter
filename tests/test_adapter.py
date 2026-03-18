@@ -38,6 +38,11 @@ async def _async_iter(*items: Any) -> AsyncIterator[Any]:
         yield item
 
 
+def _v2(etype: str, data: Any, ns: tuple[str, ...] = (), **extra: Any) -> dict[str, Any]:
+    """Helper to build a LangGraph v2 StreamPart dict."""
+    return {"type": etype, "ns": ns, "data": data, **extra}
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # toUIMessageStream  —  LangGraph mode
 # ═══════════════════════════════════════════════════════════════════════════
@@ -46,7 +51,7 @@ async def _async_iter(*items: Any) -> AsyncIterator[Any]:
 class TestToUIMessageStreamLangGraph:
     @pytest.mark.asyncio
     async def test_start_event(self):
-        result = await _to_list(to_ui_message_stream(_async_iter(["values", {}])))
+        result = await _to_list(to_ui_message_stream(_async_iter(_v2("values", {}))))
         assert result[0] == {"type": "start"}
 
     @pytest.mark.asyncio
@@ -57,9 +62,9 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [chunk1]],
-                    ["messages", [chunk2]],
-                    ["values", {}],
+                    _v2("messages", (chunk1, {})),
+                    _v2("messages", (chunk2, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -75,8 +80,8 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [tool_msg]],
-                    ["values", {}],
+                    _v2("messages", (tool_msg, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -87,8 +92,8 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["custom", {"custom": "data"}],
-                    ["values", {}],
+                    _v2("custom", {"custom": "data"}),
+                    _v2("values", {}),
                 )
             )
         )
@@ -100,12 +105,12 @@ class TestToUIMessageStreamLangGraph:
         } in result
 
     @pytest.mark.asyncio
-    async def test_three_element_arrays(self):
+    async def test_namespaced_custom_events(self):
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["namespace", "custom", {"data": "value"}],
-                    ["values", {}],
+                    _v2("custom", {"data": "value"}, ns=("namespace",)),
+                    _v2("values", {}),
                 )
             )
         )
@@ -127,8 +132,8 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [plain_msg]],
-                    ["values", {}],
+                    _v2("messages", (plain_msg, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -147,8 +152,8 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [plain_tool]],
-                    ["values", {}],
+                    _v2("messages", (plain_tool, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -166,7 +171,7 @@ class TestToUIMessageStreamLangGraph:
                 }
             ],
         }
-        result = await _to_list(to_ui_message_stream(_async_iter(["values", values_data])))
+        result = await _to_list(to_ui_message_stream(_async_iter(_v2("values", values_data))))
         starts = [e for e in result if e.get("type") == "tool-input-start"]
         avails = [e for e in result if e.get("type") == "tool-input-available"]
         assert len(starts) == 1
@@ -194,7 +199,7 @@ class TestToUIMessageStreamLangGraph:
                 }
             ],
         }
-        result = await _to_list(to_ui_message_stream(_async_iter(["values", values_data])))
+        result = await _to_list(to_ui_message_stream(_async_iter(_v2("values", values_data))))
         starts = [e for e in result if e.get("type") == "tool-input-start"]
         assert len(starts) == 1
         assert starts[0]["toolCallId"] == "call-456"
@@ -221,8 +226,8 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [streamed]],
-                    ["values", values],
+                    _v2("messages", (streamed, {})),
+                    _v2("values", values),
                 )
             )
         )
@@ -252,8 +257,8 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [streamed]],
-                    ["values", values],
+                    _v2("messages", (streamed, {})),
+                    _v2("values", values),
                 )
             )
         )
@@ -282,8 +287,8 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [chunk]],
-                    ["values", {}],
+                    _v2("messages", (chunk, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -299,8 +304,8 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [chunk]],
-                    ["values", {}],
+                    _v2("messages", (chunk, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -317,9 +322,9 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [c1]],
-                    ["messages", [c2]],
-                    ["values", {}],
+                    _v2("messages", (c1, {})),
+                    _v2("messages", (c2, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -339,9 +344,9 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [rc]],
-                    ["messages", [tc]],
-                    ["values", {}],
+                    _v2("messages", (rc, {})),
+                    _v2("messages", (tc, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -372,9 +377,9 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [reasoning_chunk]],
-                    ["messages", [tool_call_chunk]],
-                    ["values", {}],
+                    _v2("messages", (reasoning_chunk, {})),
+                    _v2("messages", (tool_call_chunk, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -394,8 +399,8 @@ class TestToUIMessageStreamLangGraph:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [msg]],
-                    ["values", {}],
+                    _v2("messages", (msg, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -432,7 +437,7 @@ class TestToUIMessageStreamLangGraph:
                 },
             ],
         }
-        result = await _to_list(to_ui_message_stream(_async_iter(["values", values_data])))
+        result = await _to_list(to_ui_message_stream(_async_iter(_v2("values", values_data))))
         assert len([e for e in result if e.get("type") == "tool-input-start"]) == 0
 
     @pytest.mark.asyncio
@@ -455,7 +460,7 @@ class TestToUIMessageStreamLangGraph:
                 },
             ],
         }
-        result = await _to_list(to_ui_message_stream(_async_iter(["values", values_data])))
+        result = await _to_list(to_ui_message_stream(_async_iter(_v2("values", values_data))))
         starts = [e for e in result if e.get("type") == "tool-input-start"]
         avails = [e for e in result if e.get("type") == "tool-input-available"]
         assert len(starts) == 1
@@ -509,7 +514,7 @@ class TestToUIMessageStreamLangGraph:
                 },
             ],
         }
-        result = await _to_list(to_ui_message_stream(_async_iter(["values", values_data])))
+        result = await _to_list(to_ui_message_stream(_async_iter(_v2("values", values_data))))
         starts = [e for e in result if e.get("type") == "tool-input-start"]
         avails = [e for e in result if e.get("type") == "tool-input-available"]
         assert len(starts) == 1
@@ -547,7 +552,7 @@ class TestToUIMessageStreamLangGraph:
                 },
             ],
         }
-        result = await _to_list(to_ui_message_stream(_async_iter(["values", values_data])))
+        result = await _to_list(to_ui_message_stream(_async_iter(_v2("values", values_data))))
         starts = [e for e in result if e.get("type") == "tool-input-start"]
         assert len(starts) == 1
         assert starts[0]["toolCallId"] == "call_PLAIN_CURRENT"
@@ -576,7 +581,7 @@ class TestToUIMessageStreamLangGraph:
                 },
             ],
         }
-        result = await _to_list(to_ui_message_stream(_async_iter(["values", values_data])))
+        result = await _to_list(to_ui_message_stream(_async_iter(_v2("values", values_data))))
         starts = [e for e in result if e.get("type") == "tool-input-start"]
         assert len(starts) == 1
         assert starts[0]["toolCallId"] == "call_MULTI_CURRENT"
@@ -747,7 +752,7 @@ class TestLangGraphFinishEvents:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["values", {"messages": [{"id": "ai-1", "type": "ai", "content": "Hello!"}]}],
+                    _v2("values", {"messages": [{"id": "ai-1", "type": "ai", "content": "Hello!"}]}),
                 )
             )
         )
@@ -759,8 +764,8 @@ class TestLangGraphFinishEvents:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [chunk, {"langgraph_step": 0}]],
-                    ["values", {}],
+                    _v2("messages", (chunk, {"langgraph_step": 0})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -774,9 +779,9 @@ class TestLangGraphFinishEvents:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [c1, {"langgraph_step": 0}]],
-                    ["messages", [c2, {"langgraph_step": 1}]],
-                    ["values", {}],
+                    _v2("messages", (c1, {"langgraph_step": 0})),
+                    _v2("messages", (c2, {"langgraph_step": 1})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -788,7 +793,7 @@ class TestLangGraphFinishEvents:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["values", {"messages": [{"id": "ai-1", "type": "ai", "content": "Hello!"}]}],
+                    _v2("values", {"messages": [{"id": "ai-1", "type": "ai", "content": "Hello!"}]}),
                 )
             )
         )
@@ -807,7 +812,7 @@ class TestCallbacks:
         received = []
         cbs = StreamCallbacks(on_finish=lambda state: received.append(state))
         values = {"messages": [{"id": "ai-1", "type": "ai", "content": "Hello!"}]}
-        await _to_list(to_ui_message_stream(_async_iter(["values", values]), callbacks=cbs))
+        await _to_list(to_ui_message_stream(_async_iter(_v2("values", values)), callbacks=cbs))
         assert received == [values]
 
     @pytest.mark.asyncio
@@ -817,8 +822,8 @@ class TestCallbacks:
         await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["values", {"messages": [], "step": 1}],
-                    ["values", {"messages": [{"id": "ai-1"}], "step": 2}],
+                    _v2("values", {"messages": [], "step": 1}),
+                    _v2("values", {"messages": [{"id": "ai-1"}], "step": 2}),
                 ),
                 callbacks=cbs,
             )
@@ -843,7 +848,7 @@ class TestCallbacks:
         )
 
         async def error_stream():
-            yield ["values", {"messages": []}]
+            yield _v2("values", {"messages": []})
             raise Exception("Stream failed")
 
         await _to_list(to_ui_message_stream(error_stream(), callbacks=cbs))
@@ -858,7 +863,7 @@ class TestCallbacks:
             on_final=lambda _: order.append("final"),
             on_finish=lambda _: order.append("finish"),
         )
-        await _to_list(to_ui_message_stream(_async_iter(["values", {"messages": []}]), callbacks=cbs))
+        await _to_list(to_ui_message_stream(_async_iter(_v2("values", {"messages": []})), callbacks=cbs))
         assert order == ["final", "finish"]
 
     @pytest.mark.asyncio
@@ -870,7 +875,7 @@ class TestCallbacks:
         )
 
         async def err():
-            yield ["values", {"messages": []}]
+            yield _v2("values", {"messages": []})
             raise Exception("fail")
 
         await _to_list(to_ui_message_stream(err(), callbacks=cbs))
@@ -903,7 +908,7 @@ class TestCallbacks:
             results.append("finish")
 
         cbs = StreamCallbacks(on_start=on_start, on_final=on_final, on_finish=on_finish)
-        await _to_list(to_ui_message_stream(_async_iter(["values", {"messages": []}]), callbacks=cbs))
+        await _to_list(to_ui_message_stream(_async_iter(_v2("values", {"messages": []})), callbacks=cbs))
         assert results == ["start", "final", "finish"]
 
     @pytest.mark.asyncio
@@ -913,7 +918,7 @@ class TestCallbacks:
         values = {"messages": [{"id": "ai-1", "content": "Hello"}]}
         await _to_list(
             to_ui_message_stream(
-                _async_iter(["some-namespace", "values", values]),
+                _async_iter(_v2("values", values, ns=("some-namespace",))),
                 callbacks=cbs,
             )
         )
@@ -945,7 +950,7 @@ class TestCallbacks:
         )
 
         async def abort_stream():
-            yield ["values", {"messages": []}]
+            yield _v2("values", {"messages": []})
             raise asyncio.CancelledError("Aborted")
 
         await _to_list(to_ui_message_stream(abort_stream(), callbacks=cbs))
@@ -962,7 +967,7 @@ class TestCallbacks:
         )
 
         async def abort_stream():
-            yield ["values", {"messages": []}]
+            yield _v2("values", {"messages": []})
             raise asyncio.CancelledError("Aborted")
 
         await _to_list(to_ui_message_stream(abort_stream(), callbacks=cbs))
@@ -1262,8 +1267,8 @@ class TestStructuredContent:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [tool_msg, {}]],
-                    ["values", {}],
+                    _v2("messages", (tool_msg, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -1283,8 +1288,8 @@ class TestStructuredContent:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [tool_msg, {}]],
-                    ["values", {}],
+                    _v2("messages", (tool_msg, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -1302,8 +1307,8 @@ class TestStructuredContent:
         result = await _to_list(
             to_ui_message_stream(
                 _async_iter(
-                    ["messages", [tool_msg, {}]],
-                    ["values", {}],
+                    _v2("messages", (tool_msg, {})),
+                    _v2("values", {}),
                 )
             )
         )
@@ -1369,3 +1374,66 @@ class TestStructuredContent:
             "toolCallId": "tool-call-789",
             "output": "Sunny, 72°F",
         } in result
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LangGraph v2 namespace / interrupt tests
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestLangGraphV2Features:
+    @pytest.mark.asyncio
+    async def test_namespace_emitted_on_change(self):
+        chunk1 = AIMessageChunk(content="Main agent", id="msg-1")
+        chunk2 = AIMessageChunk(content="Subagent work", id="msg-2")
+        chunk3 = AIMessageChunk(content="Back to main", id="msg-3")
+        result = await _to_list(
+            to_ui_message_stream(
+                _async_iter(
+                    _v2("messages", (chunk1, {})),
+                    _v2("messages", (chunk2, {}), ns=("tools:abc-123",)),
+                    _v2("messages", (chunk3, {})),
+                    _v2("values", {}),
+                )
+            )
+        )
+        ns_events = [e for e in result if e.get("type") == "data-namespace"]
+        assert len(ns_events) == 2
+        assert ns_events[0] == {"type": "data-namespace", "data": {"ns": ["tools:abc-123"]}}
+        assert ns_events[1] == {"type": "data-namespace", "data": {"ns": []}}
+
+    @pytest.mark.asyncio
+    async def test_namespace_not_emitted_when_unchanged(self):
+        chunk1 = AIMessageChunk(content="Hello", id="msg-1")
+        chunk2 = AIMessageChunk(content=" World", id="msg-1")
+        result = await _to_list(
+            to_ui_message_stream(
+                _async_iter(
+                    _v2("messages", (chunk1, {})),
+                    _v2("messages", (chunk2, {})),
+                    _v2("values", {}),
+                )
+            )
+        )
+        ns_events = [e for e in result if e.get("type") == "data-namespace"]
+        assert len(ns_events) == 0
+
+    @pytest.mark.asyncio
+    async def test_v2_native_interrupts(self):
+        class FakeInterrupt:
+            def __init__(self, value, *, id=""):
+                self.value = value
+                self.id = id
+
+        interrupt = FakeInterrupt(
+            value={"action_requests": [{"name": "dangerous_tool", "args": {"cmd": "rm"}, "id": "call-d1"}]},
+            id="int-1",
+        )
+        result = await _to_list(
+            to_ui_message_stream(
+                _async_iter(_v2("values", {"messages": []}, interrupts=(interrupt,)))
+            )
+        )
+        approvals = [e for e in result if e.get("type") == "tool-approval-request"]
+        assert len(approvals) == 1
+        assert approvals[0]["toolCallId"] == "call-d1"
