@@ -28,18 +28,6 @@ def _chunk(d: dict[str, Any]) -> dict[str, Any]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# LangGraph event parsing
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def parse_langgraph_event(event: list[Any]) -> tuple[Any, Any]:
-    """``[ns, type, data]`` → ``(type, data)`` or ``[type, data]`` → ``(type, data)``."""
-    if len(event) == 3:
-        return event[1], event[2]
-    return event[0], event[1]
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 # Message conversion helpers  (toBaseMessages / convertModelMessages path)
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -490,12 +478,16 @@ def process_model_chunk(
 
 
 def process_langgraph_event(
-    event: list[Any],
+    etype: str,
+    data: Any,
     state: LangGraphEventState,
     emit: list[dict[str, Any]],
+    interrupts: tuple[Any, ...] | None = None,
 ) -> None:
-    """Process one LangGraph event array and append chunks to *emit*."""
-    etype, data = parse_langgraph_event(event)
+    """Process one LangGraph v2 StreamPart and append chunks to *emit*.
+
+    *interrupts* — native interrupts from ``ValuesStreamPart.interrupts``.
+    """
 
     if etype == "custom":
         custom_type = "custom"
@@ -778,58 +770,56 @@ def process_langgraph_event(
                             emit.append({"type": "reasoning-end", "id": mid2})
                             state.emitted_reasoning_ids.add(rid)
 
-        # HITL interrupts
-        if isinstance(data, dict):
-            interrupt = data.get("__interrupt__")
-            if isinstance(interrupt, (list, tuple)):
-                for item in interrupt:
-                    # LangGraph Python uses Interrupt objects with .value attribute,
-                    # not plain dicts
-                    if isinstance(item, dict):
-                        iv = item.get("value")
-                    else:
-                        iv = getattr(item, "value", None)
-                    if not isinstance(iv, dict):
-                        continue
-                    action_requests = iv.get(
-                        "actionRequests") or iv.get("action_requests")
-                    if not isinstance(action_requests, (list, tuple)):
-                        continue
-                    for ar in action_requests:
-                        tool_name = ar.get("name", "")
-                        tool_input = ar.get("args") if ar.get(
-                            "args") is not None else ar.get("arguments")
-                        key = f"{tool_name}:{json.dumps(tool_input, separators=(',', ':'))}" if tool_input is not None else ""
-                        tc_id = state.emitted_tool_calls_by_key.get(
-                            key) or ar.get("id") or f"hitl-{tool_name}-{int(time.time() * 1000)}"
-                        if tc_id not in state.emitted_tool_calls:
-                            state.emitted_tool_calls.add(tc_id)
-                            if key:
-                                state.emitted_tool_calls_by_key[key] = tc_id
-                            emit.append(
-                                {
-                                    "type": "tool-input-start",
-                                    "toolCallId": tc_id,
-                                    "toolName": tool_name,
-                                    "dynamic": True,
-                                }
-                            )
-                            emit.append(
-                                {
-                                    "type": "tool-input-available",
-                                    "toolCallId": tc_id,
-                                    "toolName": tool_name,
-                                    "input": tool_input,
-                                    "dynamic": True,
-                                }
-                            )
+        # HITL interrupts (v2 native)
+        if isinstance(interrupts, (list, tuple)):
+            for item in interrupts:
+                # LangGraph Python uses Interrupt objects with .value attribute,
+                # not plain dicts
+                if isinstance(item, dict):
+                    iv = item.get("value")
+                else:
+                    iv = getattr(item, "value", None)
+                if not isinstance(iv, dict):
+                    continue
+                action_requests = iv.get(
+                    "actionRequests") or iv.get("action_requests")
+                if not isinstance(action_requests, (list, tuple)):
+                    continue
+                for ar in action_requests:
+                    tool_name = ar.get("name", "")
+                    tool_input = ar.get("args") if ar.get(
+                        "args") is not None else ar.get("arguments")
+                    key = f"{tool_name}:{json.dumps(tool_input, separators=(',', ':'))}" if tool_input is not None else ""
+                    tc_id = state.emitted_tool_calls_by_key.get(
+                        key) or ar.get("id") or f"hitl-{tool_name}-{int(time.time() * 1000)}"
+                    if tc_id not in state.emitted_tool_calls:
+                        state.emitted_tool_calls.add(tc_id)
+                        if key:
+                            state.emitted_tool_calls_by_key[key] = tc_id
                         emit.append(
                             {
-                                "type": "tool-approval-request",
-                                "approvalId": tc_id,
+                                "type": "tool-input-start",
                                 "toolCallId": tc_id,
+                                "toolName": tool_name,
+                                "dynamic": True,
                             }
                         )
+                        emit.append(
+                            {
+                                "type": "tool-input-available",
+                                "toolCallId": tc_id,
+                                "toolName": tool_name,
+                                "input": tool_input,
+                                "dynamic": True,
+                            }
+                        )
+                    emit.append(
+                        {
+                            "type": "tool-approval-request",
+                            "approvalId": tc_id,
+                            "toolCallId": tc_id,
+                        }
+                    )
         return
 
 

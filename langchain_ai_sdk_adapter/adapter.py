@@ -22,7 +22,6 @@ from .utils import (
     convert_user_content,
     extract_reasoning_from_content_blocks,
     is_tool_result_part,
-    parse_langgraph_event,
     process_langgraph_event,
     process_model_chunk,
 )
@@ -319,10 +318,10 @@ async def to_ui_message_stream(
         async for value in stream:
             # Detect stream type on first value
             if stream_type is None:
-                if isinstance(value, (list, tuple)) and not isinstance(value, str):
-                    stream_type = "langgraph"
-                elif _is_stream_events_event(value):
+                if _is_stream_events_event(value):
                     stream_type = "streamEvents"
+                elif isinstance(value, dict) and "ns" in value:
+                    stream_type = "langgraph"
                 else:
                     stream_type = "model"
 
@@ -333,11 +332,20 @@ async def to_ui_message_stream(
             elif stream_type == "streamEvents":
                 _process_stream_events_event(value, model_state, batch)
             else:
-                event_list = list(value) if not isinstance(value, list) else value
-                etype, edata = parse_langgraph_event(event_list)
+                # LangGraph v2 StreamPart dict
+                ns = tuple(value.get("ns", ()))
+                if ns != lg_state.current_ns:
+                    lg_state.current_ns = ns
+                    batch.append({"type": "data-namespace", "data": {"ns": list(ns)}})
+
+                etype = value["type"]
+                edata = value.get("data")
                 if etype == "values":
                     last_values_data = edata
-                process_langgraph_event(event_list, lg_state, batch)
+                process_langgraph_event(
+                    etype, edata, lg_state, batch,
+                    interrupts=value.get("interrupts"),
+                )
 
             for chunk in batch:
                 # Intercept text-delta for callbacks

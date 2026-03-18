@@ -22,3 +22,4 @@ class LangGraphEventState:
     tool_call_info_by_index: dict[str, dict[int, dict[str, str]]] = field(default_factory=dict)
     current_step: int | None = None
     emitted_tool_calls_by_key: dict[str, str] = field(default_factory=dict)
+    current_ns: tuple[str, ...] = field(default_factory=tuple)
